@@ -3,6 +3,8 @@ from bs4 import BeautifulSoup
 import time
 import os
 import sys
+from flask import Flask
+import threading
 
 URL = "https://www.dell.com/pt-br/shop/cty/pdp/spd/alienware-aurora-ac16250-gaming-laptop/brpac16250ubtohsrf_x#customization-anchor"
 HEADERS = {
@@ -84,10 +86,26 @@ def monitor(interval=3600):
         time.sleep(interval)
 
 
+# --- Flask para Render ---
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "🤖 Bot de monitoramento de preços está rodando no Render!"
+
+def run():
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
+
 if __name__ == "__main__":
     if not BOT_TOKEN or not CHAT_ID:
         print("Erro: BOT_TOKEN e CHAT_ID devem estar configurados nas variáveis de ambiente!")
         sys.exit(1)
 
     send_telegram(f"🤖 Bot de monitoramento iniciado!\n💰 Limite de alerta: R$ {PRICE_THRESHOLD:,.2f}")
+
+    # Flask em paralelo
+    threading.Thread(target=run).start()
+
+    # Loop de monitoramento
     monitor(3600)  # checa a cada 1 hora
