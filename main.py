@@ -83,28 +83,11 @@ def monitor(interval=3600):
             send_telegram("⚠️ Não consegui encontrar o preço na página!")
         time.sleep(interval)
 
-# --- Mantém o Replit ativo ---
-from flask import Flask
-import threading
 
-app = Flask('')
-
-@app.route('/')
-def home():
-    return "Bot rodando! ✅"
-
-def run():
-    app.run(host='0.0.0.0', port=8080)
-
-def keep_alive():
-    t = threading.Thread(target=run)
-    t.start()
-    
 if __name__ == "__main__":
     if not BOT_TOKEN or not CHAT_ID:
         print("Erro: BOT_TOKEN e CHAT_ID devem estar configurados nas variáveis de ambiente!")
         sys.exit(1)
 
     send_telegram(f"🤖 Bot de monitoramento iniciado!\n💰 Limite de alerta: R$ {PRICE_THRESHOLD:,.2f}")
-    keep_alive()   # mantém o Replit acordado
     monitor(3600)  # checa a cada 1 hora
