@@ -32,6 +32,7 @@ DAILY_REPORT_HOUR = int(os.getenv("DAILY_REPORT_HOUR", "7"))     # hora do relat
 TIMEZONE = os.getenv("TIMEZONE", "America/Sao_Paulo")            # timezone para o relatório diário
 # =========================================================
 
+
 def parse_price(price_str):
     try:
         clean_price = price_str.replace("R$", "").replace(".", "").replace(",", ".").strip()
@@ -61,7 +62,7 @@ def get_price():
         r.raise_for_status()
         soup = BeautifulSoup(r.text, "html.parser")
 
-        # Tentativa principal (classe que já usamos)
+        # Tentativa principal (classe Dell)
         price = soup.find("span", {"class": "cf-dell-price"})
         if price:
             return price.get_text(strip=True)
@@ -114,10 +115,8 @@ def monitor(interval=3600):
 
 
 def daily_report(hour=7, tz_name="America/Sao_Paulo"):
-    """
-    Função que aguarda até a próxima ocorrência do horário 'hour' no timezone especificado
-    e envia um relatório diário com o preço atual. Executa em loop (uma vez por dia).
-    """
+    """Envia relatório diário no horário configurado (timezone)."""
+    from datetime import datetime, timedelta
     tz = ZoneInfo(tz_name)
     print(f"[daily_report] rodando no timezone {tz_name}, relatório diário às {hour}:00")
     while True:
@@ -141,8 +140,7 @@ def daily_report(hour=7, tz_name="America/Sao_Paulo"):
                 send_telegram(f"⚠️ Relatório diário ({when_str} {tz_name}): não consegui buscar o preço hoje.")
         except Exception as e:
             print(f"[daily_report] exceção: {e}")
-            # espera um minuto antes de tentar novamente, para evitar loop rápido de erros
-            time.sleep(60)
+            time.sleep(60)  # evitar loop rápido de erros
 
 
 # --- Flask para Render (mantém URL pública) ---
@@ -151,6 +149,19 @@ app = Flask(__name__)
 @app.route('/')
 def home():
     return "🤖 Bot de monitoramento de preços está rodando no Render!"
+
+# 👉 Nova rota para o cron-job.org forçar relatório diário
+@app.route('/daily-report')
+def trigger_daily_report():
+    price_str = get_price()
+    now = datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d %H:%M")
+    if price_str:
+        send_telegram(f"📊 Relatório forçado ({now} {TIMEZONE}):\n💻 Preço atual: {price_str}\n🔗 {URL}")
+        return "Relatório forçado enviado!"
+    else:
+        send_telegram(f"⚠️ Relatório forçado ({now} {TIMEZONE}): não consegui buscar o preço.")
+        return "Erro ao buscar preço."
+
 
 def run_flask():
     port = int(os.environ.get("PORT", 5000))
@@ -167,7 +178,7 @@ if __name__ == "__main__":
     threading.Thread(target=run_flask, daemon=True).start()
 
     # inicia a tarefa diária (07:00 America/Sao_Paulo) em thread separada
-    threading.Thread(target=daily_report, args=(int(os.getenv("DAILY_REPORT_HOUR", DAILY_REPORT_HOUR)), TIMEZONE), daemon=True).start()
+    threading.Thread(target=daily_report, args=(DAILY_REPORT_HOUR, TIMEZONE), daemon=True).start()
 
     # inicia o monitor principal (loop bloqueante)
-    monitor(int(os.getenv("MONITOR_INTERVAL", MONITOR_INTERVAL)))
+    monitor(MONITOR_INTERVAL)
